@@ -1,6 +1,11 @@
 # Miscellaneous
 *.class
 *.lock
+!pubspec.lock
+.env
+.idea/
+*.iml
+.codex_tmp/
 *.log
 *.pyc
 *.swp
