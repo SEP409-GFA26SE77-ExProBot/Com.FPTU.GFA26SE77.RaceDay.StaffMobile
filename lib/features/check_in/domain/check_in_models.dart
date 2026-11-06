@@ -5,15 +5,22 @@ class StaffAssignment {
   StaffAssignment(Json data) : data = Map.unmodifiable(data);
   String get eventId => data['eventId'] as String;
   String get eventName => data['eventName'] as String? ?? 'Giải chạy';
-  String get role => data['role'] as String? ?? 'volunteer';
+  String get role => switch (data['role']?.toString().trim().toLowerCase()) {
+    'race-staff' ||
+    'racestaff' ||
+    'race_staff' ||
+    'coordinator' ||
+    'volunteer' => 'race-staff',
+    final String value => value,
+    _ => '',
+  };
   String get status => data['status'] as String? ?? '';
   String? get stationLabel => data['stationLabel'] as String?;
   String? get eventDate => data['eventDate'] as String?;
   String get roleLabel => switch (role) {
-    'volunteer' => 'Tình nguyện viên',
-    'coordinator' => 'Điều phối viên',
+    'race-staff' => 'Nhân sự giải chạy',
     'photographer' => 'Nhiếp ảnh gia',
-    _ => role,
+    _ => 'Chưa xác định vai trò',
   };
 }
 

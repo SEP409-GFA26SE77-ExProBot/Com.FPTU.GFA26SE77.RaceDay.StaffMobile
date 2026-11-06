@@ -1,6 +1,6 @@
 # RaceDay StaffMobile
 
-Ứng dụng Flutter cho volunteer / nhân sự được phân công check-in runner. Cấu trúc và theme dùng cùng cách tổ chức với RunnerMobile; API đối chiếu từ UserWeb và Event/IAM backend.
+Ứng dụng Flutter cho nhân sự Race-staff / nhân sự được phân công check-in runner. Cấu trúc và theme dùng cùng cách tổ chức với RunnerMobile; API đối chiếu từ UserWeb và Event/IAM backend.
 
 ## Cấu trúc
 
@@ -48,14 +48,16 @@ Android đã khai báo INTERNET/CAMERA, cho phép HTTP để dùng backend phát
 
 ## Luồng sử dụng
 
-1. BTC thêm volunteer vào nhân sự giải trên UserWeb, liên kết đúng tài khoản và chuyển trạng thái **Active**.
+1. BTC thêm Race-staff vào nhân sự giải trên UserWeb, liên kết đúng tài khoản và chuyển trạng thái **Active**.
 2. Đăng nhập StaffMobile bằng tài khoản đó. App gọi `staff/me` và hiển thị mọi giải được phân công; chọn đúng giải.
 3. Runner mở vé đã **confirmed** trên RunnerMobile (có BIB và QR).
-4. Volunteer chọn **Quét QR vé runner**, cấp quyền camera và quét. Camera đóng sau một mã; app gửi payload cho backend.
+4. Nhân sự chọn **Quét QR vé runner**, cấp quyền camera và quét. Camera đóng sau một mã; app gửi payload cho backend.
 5. Xem tên runner, BIB, cự ly, thời điểm check-in. Quét lại hiển thị **Đã check-in trước đó**, giữ thời điểm máy chủ.
 6. Có thể nhập BIB nếu camera không dùng được; tìm kiếm và lọc danh sách theo trạng thái.
 
 IAM role không thay thế quyền tại giải. App không áp dụng bộ lọc Runner từ RunnerMobile: backend quyết định quyền qua staff assignment Active đã LinkUser. Tài khoản không có phân công sẽ thấy hướng dẫn liên hệ BTC. App không lấy danh sách giải công khai hoặc tự chọn giải bất kỳ.
+
+IAM hiện dùng `Race-staff` (gộp Coordinator/Volunteer); API phân công trả `race-staff`. App hiển thị **Nhân sự giải chạy**, vẫn đọc được tên role cũ trong cache và giữ hàng đợi offline theo user ID. Photographer có phân công Active cũng được check-in theo backend hiện tại; Manager không tự có quyền trên giải chỉ vì role tài khoản.
 
 ## API
 

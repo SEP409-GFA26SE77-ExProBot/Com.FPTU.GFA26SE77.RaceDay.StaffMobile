@@ -1,5 +1,5 @@
 name: staff_mobile
-description: RaceDay volunteer check-in application.
+description: RaceDay staff check-in application.
 publish_to: 'none'
 version: 0.1.0+1
 environment:

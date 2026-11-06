@@ -13,13 +13,14 @@ import 'package:staff_mobile/features/check_in/data/datasources/check_in_local_d
 import 'package:staff_mobile/features/check_in/data/datasources/check_in_remote_data_source.dart';
 import 'package:staff_mobile/features/check_in/data/repositories/check_in_repository_impl.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_input.dart';
+import 'package:staff_mobile/features/check_in/domain/check_in_models.dart';
 import 'package:staff_mobile/features/check_in/presentation/controller/check_in_controller.dart';
 
 const eventId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const assignment = {
   'eventId': eventId,
   'eventName': 'RaceDay Marathon',
-  'role': 'volunteer',
+  'role': 'race-staff',
   'status': 'active',
   'stationLabel': 'Quầy check-in',
   'eventDate': '2026-11-01',
@@ -43,7 +44,7 @@ final serverResult = {
   'alreadyCheckedIn': false,
 };
 
-String jwt({int? expiry, String role = 'Volunteer'}) {
+String jwt({int? expiry, String role = 'Race-staff'}) {
   final body = base64Url.encode(
     utf8.encode(
       jsonEncode({
@@ -82,7 +83,7 @@ void main() {
       UserModel(
         id: 'volunteer-1',
         username: 'vol1',
-        role: 'Volunteer',
+        role: 'Race-staff',
         token: jwt(),
       ),
     );
@@ -109,7 +110,119 @@ void main() {
   }
 
   test(
-    'Volunteer login uses IAM payload and restores a valid session',
+    'Current and cached legacy assignment roles use the Race-staff label',
+    () {
+      for (final role in [
+        'race-staff',
+        'RaceStaff',
+        'race_staff',
+        ' Coordinator ',
+        'volunteer',
+      ]) {
+        final item = StaffAssignment({...assignment, 'role': role});
+        expect(item.role, 'race-staff');
+        expect(item.roleLabel, 'Nhân sự giải chạy');
+      }
+      expect(
+        StaffAssignment({...assignment, 'role': 'Photographer'}).roleLabel,
+        'Nhiếp ảnh gia',
+      );
+      for (final role in [null, '', 'new-role']) {
+        expect(
+          StaffAssignment({...assignment, 'role': role}).roleLabel,
+          'Chưa xác định vai trò',
+        );
+      }
+    },
+  );
+
+  test(
+    'All IAM roles can log in; event access still comes from assignments',
+    () async {
+      for (final role in [
+        'User',
+        'Admin',
+        'Organizer',
+        'Race-staff',
+        'Photographer',
+        'Manager',
+      ]) {
+        final remote = AuthRemoteDataSourceImpl(
+          client: ApiClient(
+            client: MockClient(
+              (_) async => response({'accessToken': jwt(role: role)}),
+            ),
+          ),
+        );
+        await session.saveUser(await remote.login('vol1', 'password123'));
+        expect((await session.getSavedUser())!.role, role);
+        final repo = repository((_) => response([]));
+        expect((await repo.assignments()).value, isEmpty);
+      }
+      expect(UserModel.fromToken(token: '', payload: {}).role, 'Unknown');
+      expect(
+        UserModel.fromToken(
+          token: '',
+          payload: {'roleId': '22222222-anything'},
+        ).role,
+        'Unknown',
+      );
+    },
+  );
+
+  test(
+    'Legacy cached assignments and pending check-ins survive the role rename',
+    () async {
+      await local.write('assignments', [
+        {...assignment, 'role': 'volunteer'},
+      ]);
+      await local.write('list_$eventId', [runner]);
+      final offline = repository((_) => throw http.ClientException('offline'));
+      final cached = (await offline.assignments()).value.single;
+      expect(cached.roleLabel, 'Nhân sự giải chạy');
+      await offline.checkIn(CheckInInput.qr(eventId, qr));
+      final online = repository(
+        (request) => response(
+          request.url.path.endsWith('/staff/me') ? [assignment] : serverResult,
+        ),
+      );
+      await online.assignments();
+      expect((await online.pending()).length, 1);
+      await online.synchronize({eventId});
+      expect(await online.pending(), isEmpty);
+    },
+  );
+
+  test(
+    'An active Photographer assignment can load the roster and check in',
+    () async {
+      await session.saveUser(
+        UserModel(
+          username: 'photo',
+          role: 'Photographer',
+          token: jwt(role: 'Photographer'),
+        ),
+      );
+      final repo = repository(
+        (request) => response(switch (request.url.path) {
+          '/api/v1/event/staff/me' => [
+            {...assignment, 'role': 'photographer'},
+          ],
+          '/api/v1/event/check-ins' => [runner],
+          _ => serverResult,
+        }),
+      );
+      expect((await repo.assignments()).value.single.role, 'photographer');
+      expect((await repo.entries(eventId)).value.single.bibNumber, '000123');
+      expect(
+        (await repo.checkIn(CheckInInput.qr(eventId, qr))).pendingSync,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'Race-staff login uses IAM payload and restores a valid session',
     () async {
       final remote = AuthRemoteDataSourceImpl(
         client: ApiClient(
@@ -124,7 +237,7 @@ void main() {
         ),
       );
       final user = await remote.login(' vol1 ', 'password123');
-      expect(user.role, 'Volunteer');
+      expect(user.role, 'Race-staff');
       expect(user.username, 'vol1');
       await session.saveUser(user);
       expect((await session.getSavedUser())!.id, 'volunteer-1');
@@ -135,7 +248,7 @@ void main() {
     'Expired session is cleared and never makes an authenticated call',
     () async {
       await session.saveUser(
-        UserModel(username: 'vol1', role: 'Volunteer', token: jwt(expiry: 1)),
+        UserModel(username: 'vol1', role: 'Race-staff', token: jwt(expiry: 1)),
       );
       var calls = 0;
       var expired = 0;
@@ -178,7 +291,9 @@ void main() {
             fail('Unexpected endpoint: ${request.url}');
         }
       });
-      expect((await repo.assignments()).value.single.eventId, eventId);
+      final assigned = (await repo.assignments()).value.single;
+      expect(assigned.eventId, eventId);
+      expect(assigned.roleLabel, 'Nhân sự giải chạy');
       expect((await repo.entries(eventId)).value.single.bibNumber, '000123');
       final result = await repo.checkIn(CheckInInput.qr(eventId, qr));
       expect(result.fullName, 'Nguyễn An');

@@ -21,20 +21,11 @@ class UserModel extends UserEntity {
         payload['roles'] ??
         payload['Role'];
 
-    String resolvedRole = 'User';
+    String resolvedRole = 'Unknown';
     if (rawRole is List && rawRole.isNotEmpty) {
-      resolvedRole = rawRole.first.toString();
+      resolvedRole = rawRole.first.toString().trim();
     } else if (rawRole != null) {
-      resolvedRole = rawRole.toString();
-    } else {
-      final roleId = payload['roleId']?.toString().toLowerCase();
-      if (roleId != null && roleId.startsWith('22222222')) {
-        resolvedRole = 'User';
-      } else if (roleId != null && roleId.startsWith('11111111')) {
-        resolvedRole = 'Admin';
-      } else if (roleId != null && roleId.startsWith('33333333')) {
-        resolvedRole = 'Organizer';
-      }
+      resolvedRole = rawRole.toString().trim();
     }
 
     final id =
@@ -84,7 +75,7 @@ class UserModel extends UserEntity {
     username: json['username'] ?? 'Staff',
     email: json['email'],
     fullName: json['fullName'],
-    role: json['role'] ?? 'User',
+    role: json['role'] ?? 'Unknown',
     token: json['token'] ?? '',
   );
 }

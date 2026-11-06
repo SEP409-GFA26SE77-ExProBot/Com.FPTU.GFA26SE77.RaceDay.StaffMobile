@@ -15,7 +15,7 @@ class FakeRepository implements CheckInRepository {
     StaffAssignment({
       'eventId': 'event-1',
       'eventName': 'RaceDay Marathon',
-      'role': 'volunteer',
+      'role': 'race-staff',
       'status': 'active',
       'stationLabel': 'Quầy 1',
     }),
@@ -84,6 +84,7 @@ void main() {
           home: CheckInScreen(controller: controller),
         ),
       );
+      expect(find.text('Nhân sự giải chạy · Quầy 1'), findsOneWidget);
       await tester.enterText(
         find.widgetWithText(TextField, 'Số BIB'),
         '000123',
