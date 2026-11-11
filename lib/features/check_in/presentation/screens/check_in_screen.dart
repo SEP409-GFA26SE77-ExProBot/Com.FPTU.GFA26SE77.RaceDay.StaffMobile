@@ -297,8 +297,14 @@ class _CheckInScreenState extends State<CheckInScreen> {
   );
 
   Widget _result(CheckInResult result) => StatusPanel(
-    color: result.pendingSync ? AppColors.primary : AppColors.success,
-    icon: result.pendingSync
+    color: result.alreadyCheckedIn
+        ? AppColors.error
+        : result.pendingSync
+        ? AppColors.primary
+        : AppColors.success,
+    icon: result.alreadyCheckedIn
+        ? Icons.error_outline
+        : result.pendingSync
         ? Icons.cloud_upload_outlined
         : Icons.check_circle_outline,
     message:

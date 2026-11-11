@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:staff_mobile/core/constants/app_colors.dart';
 import 'package:staff_mobile/core/theme/app_theme.dart';
 import 'package:staff_mobile/features/authentication/presentation/screens/login_screen.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_input.dart';
@@ -7,6 +8,7 @@ import 'package:staff_mobile/features/check_in/domain/check_in_models.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_repository.dart';
 import 'package:staff_mobile/features/check_in/presentation/controller/check_in_controller.dart';
 import 'package:staff_mobile/features/check_in/presentation/screens/check_in_screen.dart';
+import 'package:staff_mobile/shared/widgets/status_panel.dart';
 
 class FakeRepository implements CheckInRepository {
   bool duplicate = false;
@@ -92,6 +94,10 @@ void main() {
       await tester.tap(find.text('Check-in'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Check-in thành công'), findsOneWidget);
+      expect(
+        tester.widget<StatusPanel>(find.byType(StatusPanel)).color,
+        AppColors.success,
+      );
       expect(find.textContaining('BIB 000123 · Nguyễn An'), findsOneWidget);
       repository.duplicate = true;
       await tester.enterText(
@@ -102,6 +108,14 @@ void main() {
       await tester.tap(find.text('Check-in'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Đã check-in trước đó'), findsOneWidget);
+      expect(
+        tester.widget<StatusPanel>(find.byType(StatusPanel)).color,
+        AppColors.error,
+      );
+      expect(
+        tester.widget<StatusPanel>(find.byType(StatusPanel)).icon,
+        Icons.error_outline,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       controller.dispose();
