@@ -3,7 +3,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../shared/widgets/brand_logo.dart';
 import '../../../../shared/widgets/custom_button.dart';
 import '../controller/auth_controller.dart';
-import '../../../home/presentation/screens/home_screen.dart';
+import 'signed_in_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (await _controller.login(_username.text, _password.text) && mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => HomeScreen(user: _controller.currentUser!),
+          builder: (_) => signedInScreen(_controller.currentUser!),
         ),
       );
     }
@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const BrandLogo(iconSize: 28, fontSize: 26),
                     const SizedBox(height: 40),
                     const Text(
-                      'Sẵn sàng đón runner',
+                      'Đăng nhập RaceDay',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Đăng nhập tài khoản được ban tổ chức phân công để check-in tại giải.',
+                      'Sử dụng tài khoản được ban tổ chức phân công.',
                       style: TextStyle(color: AppColors.textMuted, height: 1.5),
                     ),
                     const SizedBox(height: 28),

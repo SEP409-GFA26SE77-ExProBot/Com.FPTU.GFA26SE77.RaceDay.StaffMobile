@@ -9,7 +9,7 @@
 
 ## Các bước trên thiết bị
 
-1. Đăng nhập volunteer → thấy giải A và đúng quầy/trạm. Mở A → roster chỉ chứa runner confirmed.
+1. Đăng nhập Race-staff → vào thẳng Check-in. Nhấn logo RaceDay để chọn giải A nếu cần. Kiểm tra đúng quầy/trạm và danh sách chỉ chứa runner confirmed.
 2. Mở vé runner trên RunnerMobile → quét từ StaffMobile → tên/BIB/cự ly đúng, hiện thành công.
 3. Làm mới trang scan-qr UserWeb hoặc chi tiết vé RunnerMobile → cùng checkedInAtUtc.
 4. Quét lại cùng vé → đã check-in trước đó; thời điểm không đổi.

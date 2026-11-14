@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../../../shared/widgets/brand_logo.dart';
-import '../../../home/presentation/screens/home_screen.dart';
 import 'login_screen.dart';
+import 'signed_in_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,7 +23,7 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) =>
-            user == null ? const LoginScreen() : HomeScreen(user: user),
+            user == null ? const LoginScreen() : signedInScreen(user),
       ),
     );
   }
@@ -35,8 +35,6 @@ class _SplashScreenState extends State<SplashScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           BrandLogo(iconSize: 36, fontSize: 32),
-          SizedBox(height: 24),
-          Text('RaceDay Staff · Đồng hành cùng runner'),
           SizedBox(height: 24),
           CircularProgressIndicator(),
         ],

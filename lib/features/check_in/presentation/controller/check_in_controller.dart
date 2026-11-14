@@ -37,7 +37,7 @@ class CheckInController extends ChangeNotifier {
     try {
       final loaded = await repository.assignments();
       if (_disposed) return;
-      assignments = loaded.value;
+      assignments = loaded.value.where((a) => a.role == 'race-staff').toList();
       offline = loaded.offline;
       final selectedId = selected?.eventId;
       if (selectedId != null) {
@@ -48,10 +48,13 @@ class CheckInController extends ChangeNotifier {
           lastResult = null;
           error = 'Bạn không còn được phân công tại giải này.';
         }
+      } else if (assignments.isNotEmpty) {
+        selected = assignments.first;
+        lastResult = null;
       }
       if (!offline) {
         offline = !await repository.synchronize(
-          assignments.map((a) => a.eventId).toSet(),
+          loaded.value.map((a) => a.eventId).toSet(),
         );
       }
       if (selected != null) await _loadEntries();
