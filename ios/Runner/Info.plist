@@ -10,6 +10,8 @@
 	<string>RaceDay Staff</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Quét mã QR vé RaceDay để check-in vận động viên tại giải.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Gửi vị trí của bạn trong giải khi bạn bật Check-in.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Kết nối API RaceDay trên mạng nội bộ khi phát triển.</string>
 	<key>NSAppTransportSecurity</key>

@@ -2,6 +2,7 @@ import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/errors/app_exceptions.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../authentication/data/datasources/auth_local_data_source.dart';
+import '../../../staff/data/datasources/staff_assignments_remote_data_source.dart';
 import '../../domain/check_in_models.dart';
 
 class CheckInRemoteDataSource {
@@ -23,16 +24,8 @@ class CheckInRemoteDataSource {
     return user.token;
   }
 
-  Future<List<StaffAssignment>> assignments() async {
-    final data = await client.get(
-      ApiEndpoints.assignments,
-      token: await _token(),
-    );
-    return (data as List)
-        .map((e) => StaffAssignment(Json.from(e as Map)))
-        .where((e) => e.status.toLowerCase() == 'active')
-        .toList();
-  }
+  Future<List<StaffAssignment>> assignments() async =>
+      StaffAssignmentsRemoteDataSource(client).load(await _token());
 
   Future<List<CheckInEntry>> entries(String eventId) async {
     final data = await client.get(

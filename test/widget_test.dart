@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:staff_mobile/core/constants/app_colors.dart';
 import 'package:staff_mobile/core/theme/app_theme.dart';
+import 'package:staff_mobile/features/authentication/domain/entities/user_entity.dart';
 import 'package:staff_mobile/features/authentication/presentation/screens/login_screen.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_input.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_models.dart';
 import 'package:staff_mobile/features/check_in/domain/check_in_repository.dart';
 import 'package:staff_mobile/features/check_in/presentation/controller/check_in_controller.dart';
 import 'package:staff_mobile/features/check_in/presentation/screens/check_in_screen.dart';
+import 'package:staff_mobile/features/staff/presentation/screens/staff_screen.dart';
 import 'package:staff_mobile/shared/widgets/status_panel.dart';
 
 class FakeRepository implements CheckInRepository {
@@ -20,6 +22,18 @@ class FakeRepository implements CheckInRepository {
       'role': 'race-staff',
       'status': 'active',
       'stationLabel': 'Quầy 1',
+    }),
+    StaffAssignment({
+      'eventId': 'event-2',
+      'eventName': 'RaceDay Trail',
+      'role': 'race-staff',
+      'status': 'active',
+    }),
+    StaffAssignment({
+      'eventId': 'event-3',
+      'eventName': 'Photographer only',
+      'role': 'photographer',
+      'status': 'active',
     }),
   ]);
   @override
@@ -70,6 +84,42 @@ void main() {
   });
 
   testWidgets(
+    'Staff opens check-in directly and changes events in the drawer',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StaffScreen(
+            user: const UserEntity(
+              username: 'staff',
+              role: 'Race-staff',
+              token: 'demo-token',
+            ),
+            repository: FakeRepository(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('RaceDay Marathon'), findsOneWidget);
+      expect(find.text('Quét QR vé runner'), findsOneWidget);
+      expect(find.text('Thống kê ảnh'), findsNothing);
+      expect(find.text('Giải được phân công'), findsNothing);
+
+      await tester.tap(find.byTooltip('Mở menu RaceDay'));
+      await tester.pumpAndSettle();
+      expect(find.text('Staff'), findsOneWidget);
+      expect(find.text('Photographer only'), findsNothing);
+      await tester.tap(find.text('RaceDay Trail'));
+      await tester.pumpAndSettle();
+      expect(find.text('RaceDay Trail'), findsOneWidget);
+      expect(find.text('RaceDay Marathon'), findsNothing);
+
+      await tester.tap(find.byTooltip('Làm mới'));
+      await tester.pumpAndSettle();
+      expect(find.text('RaceDay Trail'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'Narrow screen manual check-in shows runner and duplicate result',
     (tester) async {
       tester.view.physicalSize = const Size(390, 1000);
@@ -79,11 +129,10 @@ void main() {
       final repository = FakeRepository();
       final controller = CheckInController(repository);
       await controller.refresh();
-      await controller.select(controller.assignments.single);
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.lightTheme,
-          home: CheckInScreen(controller: controller),
+          home: Scaffold(body: CheckInScreen(controller: controller)),
         ),
       );
       expect(find.text('Nhân sự giải chạy · Quầy 1'), findsOneWidget);

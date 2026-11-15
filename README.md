@@ -12,7 +12,8 @@ lib/
       data/             # remote/local datasource, model, repository
       domain/           # entity, repository contract, login use case
       presentation/     # controller, splash, login
-    home/presentation/  # danh sách giải được phân công
+    staff/presentation/ # màn hình Staff và chọn giải trong drawer
+    photographer/       # màn hình thống kê ảnh và chọn giải trong drawer
     check_in/
       data/             # API, cache theo tài khoản, hàng đợi offline
       domain/           # model, kiểm tra QR/BIB, repository contract
@@ -49,7 +50,7 @@ Android đã khai báo INTERNET/CAMERA, cho phép HTTP để dùng backend phát
 ## Luồng sử dụng
 
 1. BTC thêm Race-staff vào nhân sự giải trên UserWeb, liên kết đúng tài khoản và chuyển trạng thái **Active**.
-2. Đăng nhập StaffMobile bằng tài khoản đó. App gọi `staff/me` và hiển thị mọi giải được phân công; chọn đúng giải.
+2. Đăng nhập StaffMobile bằng tài khoản đó. App mở thẳng Check-in ở giải Staff đầu tiên được phân công. Nhấn logo RaceDay để đổi giải hoặc đăng xuất, và dùng nút làm mới để tải lại dữ liệu.
 3. Runner mở vé đã **confirmed** trên RunnerMobile (có BIB và QR).
 4. Nhân sự chọn **Quét QR vé runner**, cấp quyền camera và quét. Camera đóng sau một mã; app gửi payload cho backend.
 5. Xem tên runner, BIB, cự ly, thời điểm check-in. Quét lại hiển thị **Đã check-in trước đó**, giữ thời điểm máy chủ.
@@ -57,7 +58,7 @@ Android đã khai báo INTERNET/CAMERA, cho phép HTTP để dùng backend phát
 
 IAM role không thay thế quyền tại giải. App không áp dụng bộ lọc Runner từ RunnerMobile: backend quyết định quyền qua staff assignment Active đã LinkUser. Tài khoản không có phân công sẽ thấy hướng dẫn liên hệ BTC. App không lấy danh sách giải công khai hoặc tự chọn giải bất kỳ.
 
-IAM hiện dùng `Race-staff` (gộp Coordinator/Volunteer); API phân công trả `race-staff`. App hiển thị **Nhân sự giải chạy**, vẫn đọc được tên role cũ trong cache và giữ hàng đợi offline theo user ID. Photographer có phân công Active cũng được check-in theo backend hiện tại; Manager không tự có quyền trên giải chỉ vì role tài khoản.
+IAM hiện dùng `Race-staff` (gộp Coordinator/Volunteer); API phân công trả `race-staff`. App hiển thị **Nhân sự giải chạy**, vẫn đọc được tên role cũ trong cache và giữ hàng đợi offline theo user ID. Tài khoản `Photographer` mở thẳng **Thống kê ảnh**, với các giải có phân công Photographer Active trong drawer RaceDay. Manager không tự có quyền trên giải chỉ vì role tài khoản.
 
 ## API
 
@@ -78,6 +79,10 @@ QR RunnerMobile tương thích trực tiếp:
 
 Không gửi đồng thời `bib` và `qrPayload`: backend ưu tiên `bib`, nên giữ QR nguyên bản để kiểm tra event. QR chỉ chứa số BIB cũng được hỗ trợ như UserWeb. Không cần thay đổi backend hoặc RunnerMobile.
 
+## Chia sẻ vị trí tại giải
+
+Trong drawer RaceDay, bật **Check-in** để chia sẻ vị trí GPS của bạn cho giải đang chọn, mỗi 5 giây khi ứng dụng ở foreground. Tắt công tắc để dừng. Đổi giải sẽ tắt chia sẻ và yêu cầu bật lại cho giải mới. Cảnh báo rời vùng hoạt động hiện khi đang mở cùng giải.
+
 ## Mất mạng
 
 - Cần mở giải và tải danh sách khi còn mạng trước.
@@ -86,7 +91,7 @@ Không gửi đồng thời `bib` và `qrPayload`: backend ưu tiên `bib`, nên
 - Queue/cache nằm riêng theo user ID; đăng xuất giữ queue nhưng tài khoản khác không đọc/đồng bộ được.
 - Thử đồng bộ khi mở app, trở lại app, nhấn làm mới và mỗi 30 giây khi app foreground có queue.
 - Khi đồng bộ, gửi nguyên QR (hoặc BIB nhập tay), kiểm tra lại quyền và trạng thái trên backend.
-- Chỉ xóa queue sau phản hồi thành công. Lỗi bị từ chối giữ lại kèm lý do, hiển thị trên trang phân công và danh sách runner.
+- Chỉ xóa queue sau phản hồi thành công. Lỗi bị từ chối giữ lại kèm lý do, hiển thị trong drawer Staff và danh sách runner.
 - Thời điểm server xác nhận là `checkedInAtUtc` chính thức. Thời gian lưu offline chỉ mang tính tạm thời; API hiện không nhận timestamp offline.
 - Không xóa dữ liệu ứng dụng khi còn queue. Cache trên thiết bị không thể biết ngay các thay đổi quyền/trạng thái trong lúc mất mạng.
 
