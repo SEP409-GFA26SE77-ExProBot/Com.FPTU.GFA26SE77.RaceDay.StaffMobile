@@ -19,6 +19,8 @@ class ApiClient {
       _request('POST', url, token: token, body: body);
   Future<dynamic> put(String url, {dynamic body, String? token}) =>
       _request('PUT', url, token: token, body: body);
+  Future<dynamic> delete(String url, {String? token}) =>
+      _request('DELETE', url, token: token);
 
   Future<dynamic> _request(
     String method,

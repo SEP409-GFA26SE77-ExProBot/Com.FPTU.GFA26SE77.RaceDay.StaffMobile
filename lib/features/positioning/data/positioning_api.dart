@@ -27,6 +27,18 @@ class PositioningApi {
     return result is Map ? result['zoneStatus'] as String? : null;
   }
 
+  /// Checks in with the organizer's rotating QR. Throws [AppException] with
+  /// the server message when the code is wrong or expired.
+  Future<void> checkIn(String eventId, String code) => _api.post(
+    ApiEndpoints.positioning(eventId, 'check-in'),
+    token: token,
+    body: {'code': code},
+  );
+
+  Future<void> checkOut(String eventId) =>
+      _api.delete(ApiEndpoints.positioning(eventId, 'check-in'), token: token);
+
+  /// Out-of-zone alerts. The server only sends this user's own alerts.
   Stream<String> alerts(String eventId, http.Client client) async* {
     final request =
         http.Request(
@@ -60,9 +72,8 @@ class PositioningApi {
       } else if (line.startsWith('data:') && event == 'outside') {
         final alert = jsonDecode(line.substring(5)) as Map<String, dynamic>;
         if (alert['eventId']?.toString().toLowerCase() ==
-                eventId.toLowerCase() &&
-            alert['staffName'] is String) {
-          yield '${alert['staffName']} đã rời vùng hoạt động.';
+            eventId.toLowerCase()) {
+          yield 'Bạn đang ở ngoài vùng hoạt động được phân công.';
         }
       } else if (line.isEmpty) {
         event = null;
