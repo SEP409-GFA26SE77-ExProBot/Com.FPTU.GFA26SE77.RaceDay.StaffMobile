@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../core/constants/app_colors.dart';
 import '../../features/check_in/domain/check_in_models.dart';
 import '../../features/positioning/presentation/position_tracking.dart';
+import '../../features/positioning/presentation/staff_check_in_scan_screen.dart';
 import 'brand_logo.dart';
 
 class WorkspaceScaffold extends StatefulWidget {
@@ -40,15 +43,7 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
   @override
   void initState() {
     super.initState();
-    _tracking = PositionTracking(
-      widget.positioningToken,
-      onAlert: (message) {
-        if (!mounted) return;
-        ScaffoldMessenger.maybeOf(
-          context,
-        )?.showSnackBar(SnackBar(content: Text(message)));
-      },
-    );
+    _tracking = PositionTracking(widget.positioningToken);
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null) _tracking.lifecycle(lifecycle);
     _tracking.selectEvent(widget.selectedEventId);
@@ -70,6 +65,117 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
     WidgetsBinding.instance.removeObserver(this);
     _tracking.dispose();
     super.dispose();
+  }
+
+  StaffAssignment? get _selected => widget.assignments
+      .where((assignment) => assignment.eventId == widget.selectedEventId)
+      .firstOrNull;
+
+  static String _formatDate(String value) {
+    final date = DateTime.tryParse(value);
+    return date == null ? value : DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  Widget _eventHeader(BuildContext context) {
+    final selected = _selected;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      color: AppColors.primaryLight,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            selected?.eventName ?? 'Chưa chọn giải',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (selected?.eventDate case final String date) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _formatDate(date),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Persistent red banner while the server says this user is outside the
+  /// assigned zone. It cannot be dismissed; it goes away on the next "inside".
+  Widget _outsideZoneToast() => ListenableBuilder(
+    listenable: _tracking,
+    builder: (context, _) => !_tracking.outsideZone
+        ? const SizedBox.shrink()
+        : SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Material(
+                color: AppColors.error,
+                elevation: 6,
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.white),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Bạn đang ở ngoài vùng hoạt động được phân công. '
+                          'Hãy quay lại vùng của mình.',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+  );
+
+  /// Turning Check-in on opens the QR scanner; GPS starts only after the
+  /// organizer's code is accepted.
+  Future<void> _toggleCheckIn(bool enabled) async {
+    if (!enabled) {
+      _tracking.checkOut();
+      return;
+    }
+    final eventId = widget.selectedEventId;
+    if (eventId == null) return;
+    final eventName = widget.assignments
+        .where((assignment) => assignment.eventId == eventId)
+        .map((assignment) => assignment.eventName)
+        .firstOrNull;
+    final checkedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => StaffCheckInScanScreen(
+          eventName: eventName ?? 'Check-in nhân sự',
+          onCode: _tracking.checkIn,
+        ),
+      ),
+    );
+    if (checkedIn != true || !mounted) return;
+    if (widget.selectedEventId != eventId) return;
+    await _tracking.start();
   }
 
   @override
@@ -100,8 +206,10 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
         child: Builder(
           builder: (context) => Column(
             children: [
+              _eventHeader(context),
               ListTile(
-                title: Text(widget.title),
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(_selected?.roleLabel ?? widget.title),
                 subtitle: Text(widget.accountName),
               ),
               ListenableBuilder(
@@ -117,14 +225,13 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
                                   ? 'Đang xin quyền vị trí…'
                                   : _tracking.enabled
                                   ? 'Đang lấy vị trí GPS…'
-                                  : 'Chia sẻ vị trí khi đang mở ứng dụng.'),
+                                  : 'Quét QR của BTC để check-in và chia sẻ vị trí.'),
                   ),
                   value: _tracking.enabled,
                   onChanged:
                       widget.selectedEventId == null || _tracking.requesting
                       ? null
-                      : (enabled) =>
-                            enabled ? _tracking.start() : _tracking.stop(),
+                      : (enabled) => _toggleCheckIn(enabled),
                 ),
               ),
               const Divider(),
@@ -177,6 +284,11 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
         ),
       ),
     ),
-    body: widget.body,
+    body: Stack(
+      children: [
+        Positioned.fill(child: widget.body),
+        Positioned(top: 0, left: 0, right: 0, child: _outsideZoneToast()),
+      ],
+    ),
   );
 }

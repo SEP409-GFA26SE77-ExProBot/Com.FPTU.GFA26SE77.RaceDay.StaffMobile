@@ -10,13 +10,13 @@ import '../data/positioning_api.dart';
 
 class PositionTracking extends ChangeNotifier {
   final PositioningApi _api;
-  final ValueChanged<String> onAlert;
 
-  PositionTracking(String token, {required this.onAlert})
-    : _api = PositioningApi(token);
+  PositionTracking(String token) : _api = PositioningApi(token);
 
   static const _interval = Duration(seconds: 5);
-  Timer? _reportTimer;
+  static const _minGap = Duration(milliseconds: 4500);
+  StreamSubscription<Position>? _positionSubscription;
+  DateTime? _lastSent;
   Timer? _alertRetry;
   http.Client? _alertClient;
   StreamSubscription<String>? _alertSubscription;
@@ -27,6 +27,10 @@ class PositionTracking extends ChangeNotifier {
   bool enabled = false;
   bool requesting = false;
   String? status;
+
+  /// True from the first "outside" report or alert until the server reports
+  /// "inside" again. Drives the red banner on the main screen.
+  bool outsideZone = false;
 
   void selectEvent(String? eventId) {
     if (_eventId == eventId) return;
@@ -41,13 +45,15 @@ class PositionTracking extends ChangeNotifier {
     final foreground = state == AppLifecycleState.resumed;
     if (foreground == _foreground) return;
     _foreground = foreground;
+    // GPS keeps running in the background through the location foreground
+    // service; only the alert stream pauses while the app is not visible.
     if (foreground) {
       _connectAlerts();
-      if (enabled) _scheduleReports();
     } else {
-      _generation++;
-      requesting = false;
-      _reportTimer?.cancel();
+      if (requesting) {
+        _generation++;
+        requesting = false;
+      }
       _cancelAlerts();
     }
     notifyListeners();
@@ -78,7 +84,7 @@ class PositionTracking extends ChangeNotifier {
       }
       if (generation != _generation) return;
       enabled = true;
-      _scheduleReports();
+      _startPositionStream();
     } catch (error) {
       if (generation == _generation) {
         status = error is AppException
@@ -93,43 +99,105 @@ class PositionTracking extends ChangeNotifier {
     }
   }
 
+  String? get eventId => _eventId;
+
+  /// Sends the scanned organizer QR. Throws [AppException] when it is wrong.
+  Future<void> checkIn(String code) async {
+    final eventId = _eventId;
+    if (eventId == null) throw AppException('Chọn giải trước khi check-in.');
+    await _api.checkIn(eventId, code);
+  }
+
+  /// Turns Check-in off: stops GPS and ends the check-in on the server.
+  void checkOut() {
+    final eventId = _eventId;
+    stop();
+    if (eventId != null) {
+      unawaited(_api.checkOut(eventId).catchError((Object _) {}));
+    }
+  }
+
   void stop({String? message}) {
     _generation++;
-    _reportTimer?.cancel();
+    _cancelPositionStream();
     enabled = false;
     requesting = false;
+    outsideZone = false;
     status = message;
     notifyListeners();
   }
 
-  void _scheduleReports() {
-    _reportTimer?.cancel();
-    unawaited(_report());
-    _reportTimer = Timer.periodic(_interval, (_) => unawaited(_report()));
+  LocationSettings _locationSettings() {
+    if (kIsWeb) return const LocationSettings(accuracy: LocationAccuracy.high);
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android => AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        intervalDuration: _interval,
+        forceLocationManager: true,
+        // Starts geolocator's foreground service so Android keeps the app
+        // alive and sending GPS while the screen is off or the app is hidden.
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'RaceDay Staff',
+          notificationText: 'Đang gửi vị trí GPS cho Check-in.',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      ),
+      TargetPlatform.iOS || TargetPlatform.macOS => AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.fitness,
+        allowBackgroundLocationUpdates: true,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      ),
+      _ => const LocationSettings(accuracy: LocationAccuracy.high),
+    };
   }
 
-  Future<void> _report() async {
+  void _startPositionStream() {
+    _cancelPositionStream();
+    _positionSubscription = Geolocator.getPositionStream(
+      locationSettings: _locationSettings(),
+    ).listen((position) => unawaited(_report(position)), onError: _onGpsError);
+  }
+
+  void _cancelPositionStream() {
+    unawaited(_positionSubscription?.cancel());
+    _positionSubscription = null;
+    _lastSent = null;
+  }
+
+  void _onGpsError(Object error) {
+    if (!enabled) return;
+    if (error is PermissionDeniedException) {
+      stop(message: 'Cấp quyền vị trí trong cài đặt để dùng Check-in.');
+      return;
+    }
+    status = error is LocationServiceDisabledException
+        ? 'Bật dịch vụ vị trí để dùng Check-in.'
+        : 'Chưa lấy được vị trí GPS. Đang thử lại.';
+    notifyListeners();
+  }
+
+  Future<void> _report(Position position) async {
     final eventId = _eventId;
-    if (!enabled || !_foreground || _sending || eventId == null) return;
+    final now = DateTime.now();
+    if (!enabled || _sending || eventId == null) return;
+    final lastSent = _lastSent;
+    if (lastSent != null && now.difference(lastSent) < _minGap) return;
     final generation = _generation;
     _sending = true;
+    _lastSent = now;
     try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings:
-            !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-            ? AndroidSettings(
-                accuracy: LocationAccuracy.high,
-                timeLimit: _interval,
-                forceLocationManager: true,
-              )
-            : const LocationSettings(
-                accuracy: LocationAccuracy.high,
-                timeLimit: _interval,
-              ),
-      );
-      if (generation != _generation) return;
       final zone = await _api.report(eventId, position);
       if (generation != _generation) return;
+      // "uncertain" (GPS accuracy straddles the edge) keeps the last state so
+      // the banner does not flicker at the zone boundary.
+      if (zone == 'outside') {
+        outsideZone = true;
+      } else if (zone != 'uncertain') {
+        outsideZone = false;
+      }
       status = switch (zone) {
         'outside' => 'Đang ở ngoài vùng hoạt động.',
         'unconfigured' => 'Đang gửi GPS. Phân công chưa có vùng hoạt động.',
@@ -143,12 +211,9 @@ class PositionTracking extends ChangeNotifier {
       } else {
         status = error.message;
       }
-    } on PermissionDeniedException {
-      if (generation != _generation) return;
-      stop(message: 'Cấp quyền vị trí trong cài đặt để dùng Check-in.');
     } catch (_) {
       if (generation == _generation) {
-        status = 'Chưa lấy được vị trí GPS. Đang thử lại.';
+        status = 'Chưa gửi được vị trí. Đang thử lại.';
       }
     } finally {
       _sending = false;
@@ -175,7 +240,15 @@ class PositionTracking extends ChangeNotifier {
 
     _alertSubscription = _api
         .alerts(eventId, client)
-        .listen(onAlert, onError: reconnect, onDone: reconnect);
+        .listen(
+          (_) {
+            if (!enabled) return;
+            outsideZone = true;
+            notifyListeners();
+          },
+          onError: reconnect,
+          onDone: reconnect,
+        );
   }
 
   void _cancelAlerts() {
@@ -190,8 +263,9 @@ class PositionTracking extends ChangeNotifier {
   void dispose() {
     _generation++;
     enabled = false;
+    outsideZone = false;
     status = null;
-    _reportTimer?.cancel();
+    _cancelPositionStream();
     _cancelAlerts();
     super.dispose();
   }
