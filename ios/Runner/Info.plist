@@ -9,7 +9,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>RaceDay Staff</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Quét mã QR vé RaceDay để check-in vận động viên tại giải.</string>
+	<string>Quét mã QR và chụp ảnh sự cố để báo cáo tới BTC.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Chọn ảnh sự cố để báo cáo tới BTC.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

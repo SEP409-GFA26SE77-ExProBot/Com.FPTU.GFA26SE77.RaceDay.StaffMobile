@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../features/check_in/domain/check_in_models.dart';
 import '../../features/positioning/presentation/position_tracking.dart';
 import '../../features/positioning/presentation/staff_check_in_scan_screen.dart';
+import '../../features/positioning/presentation/staff_report_screen.dart';
 import 'brand_logo.dart';
 
 class WorkspaceScaffold extends StatefulWidget {
@@ -178,6 +179,22 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
     await _tracking.start();
   }
 
+  Future<void> _openReport() async {
+    if (widget.selectedEventId == null) return;
+    final sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => StaffReportScreen(
+          eventName: _selected?.eventName ?? 'Báo cáo sự cố',
+          onSubmit: _tracking.submitReport,
+        ),
+      ),
+    );
+    if (sent != true || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Đã gửi báo cáo tới Ban tổ chức.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -234,18 +251,20 @@ class _WorkspaceScaffoldState extends State<WorkspaceScaffold>
                       : (enabled) => _toggleCheckIn(enabled),
                 ),
               ),
+              ListTile(
+                leading: const Icon(Icons.report_outlined),
+                title: const Text('Báo cáo'),
+                subtitle: const Text('Gửi sự cố tới Ban tổ chức.'),
+                enabled: widget.selectedEventId != null,
+                onTap: () {
+                  Scaffold.of(context).closeDrawer();
+                  _openReport();
+                },
+              ),
               const Divider(),
               Expanded(
                 child: ListView(
                   children: [
-                    if (widget.assignments.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                        child: Text(
-                          'Chọn giải',
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                      ),
                     for (final assignment in widget.assignments)
                       ListTile(
                         leading: const Icon(Icons.event_outlined),

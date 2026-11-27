@@ -1,11 +1,31 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/network/api_client.dart';
+
+/// An incident report a staff member sends to the organizer.
+class StaffReportDraft {
+  /// One of Weather, CourseHazard, Medical, Security, Logistics, Other.
+  final String incidentType;
+  final String description;
+  final Position? position;
+  final Uint8List? photo;
+  final String photoName;
+
+  const StaffReportDraft({
+    required this.incidentType,
+    required this.description,
+    this.position,
+    this.photo,
+    this.photoName = 'su-co.jpg',
+  });
+}
 
 class PositioningApi {
   final String token;
@@ -34,6 +54,43 @@ class PositioningApi {
     token: token,
     body: {'code': code},
   );
+
+  /// Sends an incident report to the organizer, with an optional photo.
+  Future<void> submitReport(String eventId, StaffReportDraft draft) {
+    final position = draft.position;
+    final photo = draft.photo;
+    return _api.postMultipart(
+      ApiEndpoints.positioning(eventId, 'reports'),
+      token: token,
+      fields: {
+        'incidentType': draft.incidentType,
+        'description': draft.description,
+        if (position != null) ...{
+          'latitude': position.latitude.toString(),
+          'longitude': position.longitude.toString(),
+          'accuracyMeters': position.accuracy.toString(),
+        },
+      },
+      files: [
+        if (photo != null)
+          http.MultipartFile.fromBytes(
+            'photo',
+            photo,
+            filename: draft.photoName,
+            contentType: _imageType(draft.photoName),
+          ),
+      ],
+    );
+  }
+
+  static MediaType _imageType(String name) =>
+      switch (name.split('.').last.toLowerCase()) {
+        'png' => MediaType('image', 'png'),
+        'webp' => MediaType('image', 'webp'),
+        'heic' => MediaType('image', 'heic'),
+        'heif' => MediaType('image', 'heif'),
+        _ => MediaType('image', 'jpeg'),
+      };
 
   Future<void> checkOut(String eventId) =>
       _api.delete(ApiEndpoints.positioning(eventId, 'check-in'), token: token);
