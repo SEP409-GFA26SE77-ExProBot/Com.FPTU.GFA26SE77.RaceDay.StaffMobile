@@ -108,6 +108,13 @@ class PositionTracking extends ChangeNotifier {
     await _api.checkIn(eventId, code);
   }
 
+  /// Sends an incident report to the organizer. Check-in is not required.
+  Future<void> submitReport(StaffReportDraft draft) {
+    final eventId = _eventId;
+    if (eventId == null) throw AppException('Chọn giải trước khi báo cáo.');
+    return _api.submitReport(eventId, draft);
+  }
+
   /// Turns Check-in off: stops GPS and ends the check-in on the server.
   void checkOut() {
     final eventId = _eventId;

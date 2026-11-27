@@ -49,6 +49,20 @@ class ApiClient {
     return _send(request, token, const Duration(seconds: 90));
   }
 
+  /// Multipart POST with text [fields] and optional [files].
+  Future<dynamic> postMultipart(
+    String url, {
+    required String token,
+    required Map<String, String> fields,
+    List<http.MultipartFile> files = const [],
+  }) {
+    final request = http.MultipartRequest('POST', Uri.parse(url))
+      ..headers.addAll(_headers(token))
+      ..fields.addAll(fields)
+      ..files.addAll(files);
+    return _send(request, token, const Duration(seconds: 90));
+  }
+
   Future<dynamic> _send(
     http.BaseRequest request,
     String? token,
